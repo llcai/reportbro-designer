@@ -24,7 +24,6 @@ export default class TableTextElement extends TextElement {
     }
 
     setInitialData(initialData) {
-        this.growWeight = 0;
         super.setInitialData(initialData);
     }
 
@@ -81,16 +80,8 @@ export default class TableTextElement extends TextElement {
         return null;
     }
 
-    getValue(field) {
-        if (field === 'xReadOnly') {
-            // offset of this cell relative to table, needed for display in read-only field
-            return this.getOffsetX();
-        }
-        return super.getValue(field);
-    }
-
-    setValue(field, value) {
-        super.setValue(field, value);
+    setValue(field, value, elSelector, isShown) {
+        super.setValue(field, value, elSelector, isShown);
 
         if (field === 'width') {
             let table = this.getTable();
@@ -111,10 +102,8 @@ export default class TableTextElement extends TextElement {
 
     /**
      * Returns value to use for updating input control.
-     *
-     * Needed for cells with colspan > 1 because internal width is only for 1 cell but
+     * Needed for columns with colspan > 1 because internal width is only for 1 cell but
      * displayed width in input field is total width for all cells included in colspan.
-     *
      * @param {Number} field - field name.
      * @param {Number} value - value for update.
      */
@@ -214,32 +203,18 @@ export default class TableTextElement extends TextElement {
      * @returns {String[]}
      */
     getFields() {
-        let fields = this.getProperties();
-        // remove 'xReadOnly' field and add 'id'
-        fields.splice(0, 1, 'id');
-        return fields;
-    }
-
-    /**
-     * Returns all fields of this object that can be modified in the properties panel.
-     * @returns {String[]}
-     */
-    getProperties() {
-        let fields = ['xReadOnly', 'width', 'content', 'eval', 'colspan',
-            'styleId', 'bold', 'italic', 'underline', 'strikethrough',
-            'horizontalAlignment', 'verticalAlignment', 'textColor', 'backgroundColor',
-            'font', 'fontSize', 'lineSpacing',
+        let fields = ['id', 'width', 'height', 'content', 'eval', 'colspan',
+            'styleId', 'bold', 'italic', 'underline',
+            'horizontalAlignment', 'verticalAlignment', 'textColor', 'backgroundColor', 'font', 'fontSize', 'lineSpacing',
             'paddingLeft', 'paddingTop', 'paddingRight', 'paddingBottom',
-            'pattern', 'link', 'cs_condition', 'cs_styleId',
-            'cs_bold', 'cs_italic', 'cs_underline', 'cs_strikethrough',
+            'removeEmptyElement', 'alwaysPrintOnSamePage', 'pattern', 'link',
+            'cs_condition', 'cs_styleId', 'cs_bold', 'cs_italic', 'cs_underline',
             'cs_horizontalAlignment', 'cs_verticalAlignment', 'cs_textColor', 'cs_backgroundColor',
             'cs_font', 'cs_fontSize', 'cs_lineSpacing',
-            'cs_paddingLeft', 'cs_paddingTop', 'cs_paddingRight', 'cs_paddingBottom',
-            'spreadsheet_textWrap'];
+            'cs_paddingLeft', 'cs_paddingTop', 'cs_paddingRight', 'cs_paddingBottom'];
         let tableBandObj = this.rb.getDataObject(this.parentId);
         if (tableBandObj !== null && tableBandObj.getValue('bandType') === Band.bandType.header) {
             fields.push('printIf');
-            fields.push('growWeight');
         }
         return fields;
     }
@@ -294,6 +269,22 @@ export default class TableTextElement extends TextElement {
      */
     getSizers() {
         return ['E'];
+    }
+
+    getXTagId() {
+        return '';
+    }
+
+    getYTagId() {
+        return '';
+    }
+
+    getWidthTagId() {
+        return 'rbro_text_element_width';
+    }
+
+    getHeightTagId() {
+        return '';
     }
 
     hasBorderSettings() {
@@ -396,7 +387,8 @@ export default class TableTextElement extends TextElement {
             for (let i = widths.length - 1; i >= 0; i--) {
                 let cmd = new SetValueCmd(
                     tableBand.getColumn(this.columnIndex + i).getId(),
-                    'width', '' + widths[i], SetValueCmd.type.text, this.rb);
+                    this.getWidthTagId(), 'width', '' + widths[i],
+                    SetValueCmd.type.text, this.rb);
                 if (disableSelect || i > 0) {
                     cmd.disableSelect();
                 }
@@ -423,7 +415,7 @@ export default class TableTextElement extends TextElement {
 
                 // increase column count of table
                 let columns = utils.convertInputToNumber(table.getValue('columns')) + 1;
-                table.setValue('columns', columns);
+                table.setValue('columns', columns, 'rbro_table_element_columns', false);
 
                 // add a column to each table band
                 table.getValue('headerData').createColumns(columns, true, colIndex, left);
@@ -462,11 +454,7 @@ export default class TableTextElement extends TextElement {
 
                 // decrease column count of table
                 let columns = utils.convertInputToNumber(table.getValue('columns')) - 1;
-                table.setValue('columns', columns);
-
-                // subtract column width from table width
-                let tableWidth = table.getValue('widthVal');
-                table.setValue('width', tableWidth - this.widthVal);
+                table.setValue('columns', columns, 'rbro_table_element_columns', false);
 
                 // remove column from each table band
                 table.getValue('headerData').deleteColumn(colIndex);
@@ -483,11 +471,5 @@ export default class TableTextElement extends TextElement {
                 this.rb.executeCommand(cmdGroup);
             }
         }
-    }
-
-    toJS() {
-        let rv = super.toJS();
-        rv['growWeight'] = utils.convertInputToNumber(rv['growWeight']);
-        return rv;
     }
 }

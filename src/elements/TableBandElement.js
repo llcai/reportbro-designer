@@ -18,7 +18,6 @@ export default class TableBandElement extends DocElement {
         this.bandType = bandType;
         this.repeatHeader = false;
         this.alwaysPrintOnSamePage = true;
-        this.pageBreak = false;
         this.backgroundColor = '';
         this.alternateBackgroundColor = '';
         this.groupExpression = '';
@@ -26,7 +25,7 @@ export default class TableBandElement extends DocElement {
         this.columnData = [];
 
         this.heightVal = 0;
-
+        
         this.setInitialData(initialData);
     }
 
@@ -69,14 +68,14 @@ export default class TableBandElement extends DocElement {
         return null;
     }
 
-    setValue(field, value) {
+    setValue(field, value, elSelector, isShown) {
         this[field] = value;
         if (field === 'height') {
             let height = utils.convertInputToNumber(value);
             this[field + 'Val'] = height;
             this.getElement().find('td').css({ height: this.rb.toPixel(height) });
             for (let col of this.columnData) {
-                col.setValue(field, value);
+                col.setValue(field, value, elSelector, isShown);
             }
             let table = this.getParent();
             if (table !== null) {
@@ -92,17 +91,7 @@ export default class TableBandElement extends DocElement {
      * @returns {String[]}
      */
     getFields() {
-        let fields = this.getProperties();
-        fields.splice(0, 0, 'id');
-        return fields;
-    }
-
-    /**
-     * Returns all fields of this object that can be modified in the properties panel.
-     * @returns {String[]}
-     */
-    getProperties() {
-        let fields = ['height', 'backgroundColor'];
+        let fields = ['id', 'height', 'backgroundColor'];
         if (this.bandType === Band.bandType.header) {
             fields.push('repeatHeader');
         } else if (this.bandType === Band.bandType.content) {
@@ -110,7 +99,6 @@ export default class TableBandElement extends DocElement {
             fields.push('groupExpression');
             fields.push('printIf');
             fields.push('alwaysPrintOnSamePage');
-            fields.push('pageBreak');
         }
         return fields;
     }
@@ -128,6 +116,10 @@ export default class TableBandElement extends DocElement {
      */
     getSizers() {
         return [];
+    }
+
+    getHeightTagId() {
+        return 'rbro_table_band_element_height';
     }
 
     getHeight() {
@@ -294,10 +286,6 @@ export default class TableBandElement extends DocElement {
         return null;
     }
 
-    getColumns() {
-        return this.columnData;
-    }
-
     /**
      * Is called when column width of a cell was changed to update all DOM elements accordingly.
      * @param {Number} columnIndex - column index of changed cell.
@@ -310,7 +298,7 @@ export default class TableBandElement extends DocElement {
             let nextCellIndex = column.getNextCellIndex();
             if (nextCellIndex > columnIndex) {
                 if (nextCellIndex > i + 1) {
-                    for (let j = i; j < nextCellIndex && j < this.columnData.length; j++) {
+                    for (let j = i; j < nextCellIndex; j++) {
                         if (j !== columnIndex) {
                             newColumnWidth += this.columnData[j].getValue('widthVal');
                         }
@@ -382,7 +370,7 @@ export default class TableBandElement extends DocElement {
 
                 // increase content row count of table
                 let contentRows = utils.convertInputToNumber(table.getValue('contentRows')) + 1;
-                table.setValue('contentRows', contentRows);
+                table.setValue('contentRows', contentRows, 'rbro_table_element_content_rows', false);
 
                 let contentRow = table.getValue('contentDataRows')[rowIndex];
                 let data = { height: contentRow.height, columnData: [] };
@@ -420,7 +408,7 @@ export default class TableBandElement extends DocElement {
                 cmdGroup.addCommand(cmd);
 
                 // decrease content row count of table
-                table.setValue('contentRows', contentRows - 1);
+                table.setValue('contentRows', contentRows - 1, 'rbro_table_element_content_rows', false);
 
                 // remove content row
                 table.getValue('contentDataRows').splice(rowIndex, 1);

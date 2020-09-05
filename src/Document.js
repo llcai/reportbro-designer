@@ -48,7 +48,7 @@ export default class Document {
         let panel = $('#rbro_document_panel')
             .mousedown(event => {
                 if (this.rb.isDocElementSelected() && !event.shiftKey) {
-                    this.rb.deselectAll(true);
+                    this.rb.deselectAll();
                 }
                 let offset = this.elDocContent.offset();
                 this.startSelectionArea(
@@ -151,7 +151,7 @@ export default class Document {
             return false;
         });
     }
-
+    
     processMouseMove(event) {
         if (this.dragging) {
             this.processDrag(event);
@@ -228,7 +228,7 @@ export default class Document {
             $('#rbro_menu_element_drag_item').addClass('rbroHidden');
         }
     }
-
+    
     processDrag(event) {
         let absPos = getEventAbsPos(event);
         if (this.dragType === DocElement.dragType.element) {
@@ -337,15 +337,24 @@ export default class Document {
         if (tab === Document.tab.pdfLayout) {
             $('#rbro_document_tab_pdf_layout').addClass('rbroActive');
             $('#rbro_document_pdf').removeClass('rbroHidden');
-            $('#rbro_document_pdf_preview').css({ 'z-index': '', 'height': '0' });
+            $('#rbro_document_pdf_preview').css('z-index', '-1');
             $('.rbroElementButtons .rbroMenuButton').removeClass('rbroDisabled').prop('draggable', true);
             $('.rbroActionButtons .rbroActionButton').prop('disabled', false);
+
+
         } else if (this.pdfPreviewExists && tab === Document.tab.pdfPreview) {
             $('#rbro_document_tab_pdf_preview').addClass('rbroActive');
             $('#rbro_document_pdf').addClass('rbroHidden');
-            $('#rbro_document_pdf_preview').css({ 'z-index': '1', 'height': '' });
+            $('#rbro_document_pdf_preview').css('z-index', '1');
             $('.rbroElementButtons .rbroMenuButton').addClass('rbroDisabled').prop('draggable', false);
             $('.rbroActionButtons .rbroActionButton').prop('disabled', true);
+            
+            setTimeout(function(){
+                //console.log('remove rbroHidden');
+                $('#rbro_document_pdf').removeClass('rbroHidden');
+            },1000);
+
+
         }
     }
 
@@ -467,19 +476,6 @@ export default class Document {
             if (this.dragType === DocElement.dragType.element) {
                 container = this.rb.getDataObject(this.dragCurrentContainerId);
             }
-
-            // do not allow to change container of elements when multiple elements are
-            // dragged together as this could lead to unexpected results for the user
-            let selectedObjects = this.rb.getSelectedObjects();
-            if (selectedObjects.length > 1 && container !== null) {
-                for (let selectedObj of selectedObjects) {
-                    if (selectedObj.getContainerId() !== container.getId()) {
-                        container = null;
-                        break;
-                    }
-                }
-            }
-
             let dragDiff = dragObject.getDragDiff(
                 diffX, diffY, this.dragType, (this.dragSnapToGrid && this.isGridVisible()) ? this.getGridSize() : 0);
             this.rb.updateSelectionDrag(dragDiff.x, dragDiff.y, this.dragType, container, true);

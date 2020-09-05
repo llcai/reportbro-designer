@@ -1,5 +1,12 @@
 String.prototype.reverse = function () { return this.split('').reverse().join(''); };
 
+export function setInputInteger(el) {
+    el.on('keyup', function() {
+        var nvalue = this.value.reverse().replace(/[^0-9\-]|\-(?=.)/g, '').reverse();
+        if (this.value !== nvalue) this.value = nvalue;
+    });
+}
+
 export function setInputPositiveInteger(el) {
     el.on('keyup', function() {
         var nvalue = this.value.replace(/[^0-9]/g, '');
@@ -78,13 +85,11 @@ export function roundValueToUpperInterval(val, interval) {
 
 export function replaceAll(str, oldVal, newVal) {
     // not the fastest solution but works
-    let rv = str;
-    if (oldVal !== newVal) {
-        while (rv.indexOf(oldVal) !== -1) {
-            rv = rv.replace(oldVal, newVal);
-        }
+    let ret = str;
+    while (ret.indexOf(oldVal) !== -1) {
+        ret = ret.replace(oldVal, newVal);
     }
-    return rv;
+    return ret;
 }
 
 export function initColorPicker(el, rb, options) {
@@ -119,11 +124,11 @@ export function initColorPicker(el, rb, options) {
     el.spectrum(allOptions);
     el.show();  // show original text input
     el.focus(event => {
-        el.parent().addClass('rbroActive');
-    });
+            el.parent().addClass('rbroActive');
+        });
     el.blur(event => {
-        el.parent().removeClass('rbroActive');
-    });
+            el.parent().removeClass('rbroActive');
+        });
 }
 
 export function isValidColor(color) {

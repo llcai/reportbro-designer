@@ -270,14 +270,6 @@
     text-transform: uppercase;
 }
 
-.rbroMenuItem.rbroUnusedParameter {
-    background-color: #222222;
-}
-
-.rbroMenuItem.rbroUnusedParameter:hover {
-    background-color: rgba(34, 34, 34,0.8);
-}
-
 .rbroMenuItem > div {
     display: flex;
     align-items: center;

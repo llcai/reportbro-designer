@@ -5,7 +5,7 @@ module.exports = {
   entry: ['./src/main.js', './src/main.css', './src/iconfonts/style.css', './src/toggle-switch.css'],
   output: {
     filename: 'reportbro.js',
-    path: __dirname + '/dist'
+    path: __dirname + '/../static/src/dist'
   },
   devtool: 'cheap-source-map',
   performance : {

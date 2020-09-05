@@ -6,9 +6,8 @@ import MainPanelItem from '../menu/MainPanelItem';
  * Command to add and delete a parameter.
  * @class
  */
-export default class AddDeleteParameterCmd extends Command {
+export default class AddDeleteParameterCmd {
     constructor(add, initialData, id, parentId, position, rb) {
-        super();
         this.add = add;
         this.initialData = initialData;
         this.parentId = parentId;

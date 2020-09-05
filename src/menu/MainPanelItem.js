@@ -88,8 +88,7 @@ export default class MainPanelItem {
                                 draggedObj.getValue('widthVal'), draggedObj.getValue('heightVal'),
                                 dropInfo.container.getSize(), cmdGroup);
 
-                            let cmd = new SetValueCmd(
-                                draggedObj.getId(), 'containerId',
+                            let cmd = new SetValueCmd(draggedObj.getId(), null, 'containerId',
                                 dropInfo.container.getId(), SetValueCmd.type.internal, this.rb);
                             cmdGroup.addCommand(cmd);
                         }
@@ -101,7 +100,7 @@ export default class MainPanelItem {
                     }
                 }
             });
-
+        
         let nameDiv = $(`<div class="rbroMenuItemText"><span id="rbro_menu_item_name${this.id}">${name}</span></div>`);
         if (this.properties.showAdd) {
             itemDiv.append($(`<div id="rbro_menu_item_add${this.id}" class="rbroButton rbroRoundButton rbroIcon-plus"></div>`)
@@ -130,7 +129,10 @@ export default class MainPanelItem {
                     } else if (panelName === 'style') {
                         cmd = new CommandGroupCmd('Delete', this);
                         this.getData().addCommandsForDelete(cmd);
-                    } else if (this.isDocElementPanel()) {
+                    } else if (panelName === DocElement.type.text || panelName === DocElement.type.image ||
+                            panelName === DocElement.type.line || panelName === DocElement.type.table ||
+                            panelName === DocElement.type.pageBreak ||
+                            panelName === DocElement.type.frame || panelName === DocElement.type.section) {
                         if (this.getData() instanceof DocElement) {
                             cmd = new CommandGroupCmd('Delete', this);
                             this.getData().addCommandsForDelete(cmd);
@@ -152,17 +154,7 @@ export default class MainPanelItem {
                 }
             }
             if (this.properties.hasDetails) {
-                if (!this.rb.isSelectedObject(this.id)) {
-                    let clearSelection =  true;
-                    if (this.isDocElementPanel()) {
-                        clearSelection = !event.shiftKey;
-                    }
-                    this.rb.selectObject(this.id, clearSelection);
-                } else {
-                    if (event.shiftKey) {
-                        this.rb.deselectObject(this.id);
-                    }
-                }
+                this.rb.selectObject(this.id, true);
             }
         });
         if (this.properties.hasChildren) {
@@ -209,11 +201,11 @@ export default class MainPanelItem {
     }
 
     setActive() {
+        $('.rbroMenuItem').removeClass('rbroMenuItemActive');
         $(`#rbro_menu_item${this.id}`).addClass('rbroMenuItemActive');
-    }
-
-    setInactive() {
-        $(`#rbro_menu_item${this.id}`).removeClass('rbroMenuItemActive');
+        if (this.properties.hasDetails) {
+            this.rb.setDetailPanel(this.panelName, this.data);
+        }
     }
 
     getParentIds() {
@@ -410,12 +402,5 @@ export default class MainPanelItem {
             }
         }
         return rv;
-    }
-
-    isDocElementPanel() {
-        return this.panelName === DocElement.type.text || this.panelName === DocElement.type.image ||
-            this.panelName === DocElement.type.line || this.panelName === DocElement.type.table ||
-            this.panelName === DocElement.type.pageBreak || this.panelName === DocElement.type.barCode ||
-            this.panelName === DocElement.type.frame || this.panelName === DocElement.type.section;
     }
 }

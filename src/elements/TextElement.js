@@ -1,5 +1,4 @@
 import DocElement from './DocElement';
-import SetValueCmd from '../commands/SetValueCmd';
 import Style from '../data/Style';
 import * as utils from '../utils';
 
@@ -22,7 +21,7 @@ export default class TextElement extends DocElement {
         this.verticalAlignment = Style.alignment.top;
         this.textColor = '#000000';
         this.backgroundColor = '';
-        this.font = rb.getProperty('defaultFont');
+        this.font = Style.font.helvetica;
         this.fontSize = 12;
         this.lineSpacing = 1;
         this.borderColor = '#000000';
@@ -36,7 +35,7 @@ export default class TextElement extends DocElement {
         this.paddingTop = '2';
         this.paddingRight = '2';
         this.paddingBottom = '2';
-
+        
         this.cs_condition = '';
         this.cs_styleId = '';
         this.cs_bold = false;
@@ -61,7 +60,7 @@ export default class TextElement extends DocElement {
         this.cs_paddingTop = '2';
         this.cs_paddingRight = '2';
         this.cs_paddingBottom = '2';
-
+        
         this.alwaysPrintOnSamePage = true;
         this.pattern = '';
         this.link = '';
@@ -70,7 +69,6 @@ export default class TextElement extends DocElement {
         this.spreadsheet_column = '';
         this.spreadsheet_colspan = '';
         this.spreadsheet_addEmptyRow = false;
-        this.spreadsheet_textWrap = false;
 
         this.setInitialData(initialData);
 
@@ -88,46 +86,55 @@ export default class TextElement extends DocElement {
     handleDoubleClick(event) {
         super.handleDoubleClick(event);
         // focus text content input element and set caret at end of content
-        let el = $('#rbro_doc_element_content').get(0);
+        let el = $('#rbro_text_element_content').get(0);
         el.focus();
         if (typeof el.selectionStart === 'number') {
             el.selectionStart = el.selectionEnd = el.value.length;
         }
     }
 
-    setValue(field, value) {
+    setValue(field, value, elSelector, isShown) {
         if (field.indexOf('border') !== -1) {
-            // Style.setBorderValue needs to be called before super.setValue
-            // because it calls updateStyle() which expects the correct border settings
+            // Style.setBorderValue needs to be called before super.setValue because it calls updateStyle() which expects
+            // the correct border settings
             this[field] = value;
             if (field.substr(0, 3) === 'cs_') {
-                if (field === 'cs_borderWidth') {
-                    this.borderWidthVal = utils.convertInputToNumber(value);
-                }
-                Style.setBorderValue(this, field, 'cs_', value, this.rb);
+                Style.setBorderValue(this, field, 'cs_', value, elSelector, isShown);
             } else {
                 if (field === 'borderWidth') {
                     this.borderWidthVal = utils.convertInputToNumber(value);
                 }
-                Style.setBorderValue(this, field, '', value, this.rb);
+                Style.setBorderValue(this, field, '', value, elSelector, isShown);
             }
         }
 
-        super.setValue(field, value);
+        super.setValue(field, value, elSelector, isShown);
 
         if (field === 'content') {
             this.updateContent(value);
         } else if (field === 'width' || field === 'height') {
             this.updateDisplay();
+        } else if (field === 'styleId') {
+            if (value !== '') {
+                $('#rbro_text_element_style_settings').hide();
+            } else {
+                $('#rbro_text_element_style_settings').show();
+            }
+        } else if (field === 'cs_styleId') {
+            if (value !== '') {
+                $('#rbro_text_element_cs_style_settings').hide();
+            } else {
+                $('#rbro_text_element_cs_style_settings').show();
+            }
         }
     }
 
     /**
-     * Returns all fields of this object that can be modified in the properties panel.
+     * Returns all data fields of this object. The fields are used when serializing the object.
      * @returns {String[]}
      */
-    getProperties() {
-        return ['x', 'y', 'width', 'height', 'content', 'eval',
+    getFields() {
+        return ['id', 'containerId', 'x', 'y', 'width', 'height', 'content', 'eval',
             'styleId', 'bold', 'italic', 'underline', 'strikethrough',
             'horizontalAlignment', 'verticalAlignment', 'textColor', 'backgroundColor', 'font', 'fontSize',
             'lineSpacing', 'borderColor', 'borderWidth',
@@ -135,13 +142,11 @@ export default class TextElement extends DocElement {
             'paddingLeft', 'paddingTop', 'paddingRight', 'paddingBottom',
             'printIf', 'removeEmptyElement', 'alwaysPrintOnSamePage', 'pattern', 'link',
             'cs_condition', 'cs_styleId', 'cs_bold', 'cs_italic', 'cs_underline', 'cs_strikethrough',
-            'cs_horizontalAlignment', 'cs_verticalAlignment',
-            'cs_textColor', 'cs_backgroundColor', 'cs_font', 'cs_fontSize',
+            'cs_horizontalAlignment', 'cs_verticalAlignment', 'cs_textColor', 'cs_backgroundColor', 'cs_font', 'cs_fontSize',
             'cs_lineSpacing', 'cs_borderColor', 'cs_borderWidth',
             'cs_borderAll', 'cs_borderLeft', 'cs_borderTop', 'cs_borderRight', 'cs_borderBottom',
             'cs_paddingLeft', 'cs_paddingTop', 'cs_paddingRight', 'cs_paddingBottom',
-            'spreadsheet_hide', 'spreadsheet_column', 'spreadsheet_colspan',
-            'spreadsheet_addEmptyRow', 'spreadsheet_textWrap'];
+            'spreadsheet_hide', 'spreadsheet_column', 'spreadsheet_colspan', 'spreadsheet_addEmptyRow'];
     }
 
     getElementType() {
@@ -171,40 +176,6 @@ export default class TextElement extends DocElement {
             }
         }
         return style;
-    }
-
-    /**
-     * Adds commands to command group parameter to set style properties of given style.
-     *
-     * This should be called when the style was changed so all style properties
-     * will be updated as well.
-     *
-     * @param {String} styleId - id of new style or empty string if no style was selected.
-     * @param {String} fieldPrefix - field prefix when accessing properties.
-     * @param {Object[]} propertyDescriptors - list of all property descriptors to get
-     * property type for SetValueCmd.
-     * @param {CommandGroupCmd} cmdGroup - commands will be added to this command group.
-     */
-    addCommandsForChangedStyle(styleId, fieldPrefix, propertyDescriptors, cmdGroup) {
-        if (styleId !== '') {
-            let style = this.rb.getStyleById(styleId);
-            if (style !== null) {
-                let fields = style.getFields().slice(2);  // get all fields except id and name
-                for (let field of fields) {
-                    let objField = fieldPrefix + field;
-                    let value = style.getValue(field);
-                    if (value !== this.getValue(objField)) {
-                        let propertyDescriptor = propertyDescriptors[objField];
-                        let cmd = new SetValueCmd(
-                            this.getId(), objField, value, propertyDescriptor['type'], this.rb);
-                        cmd.disableSelect();
-                        cmdGroup.addCommand(cmd);
-                    }
-                }
-            }
-        }
-        cmdGroup.addCommand(new SetValueCmd(
-            this.getId(), fieldPrefix + 'styleId', styleId, SetValueCmd.type.select, this.rb));
     }
 
     getContentSize(width, height, style) {
@@ -280,6 +251,22 @@ export default class TextElement extends DocElement {
         $(`#rbro_el_content_text${this.id}`).css(styleProperties);
     }
 
+    getXTagId() {
+        return 'rbro_text_element_position_x';
+    }
+
+    getYTagId() {
+        return 'rbro_text_element_position_y';
+    }
+
+    getWidthTagId() {
+        return 'rbro_text_element_width';
+    }
+
+    getHeightTagId() {
+        return 'rbro_text_element_height';
+    }
+
     hasBorderSettings() {
         return true;
     }
@@ -318,9 +305,9 @@ export default class TextElement extends DocElement {
      * @param {CommandGroupCmd} cmdGroup - possible SetValue commands will be added to this command group.
      */
     addCommandsForChangedParameterName(parameter, newParameterName, cmdGroup) {
-        this.addCommandForChangedParameterName(parameter, newParameterName, 'content', cmdGroup);
-        this.addCommandForChangedParameterName(parameter, newParameterName, 'printIf', cmdGroup);
-        this.addCommandForChangedParameterName(parameter, newParameterName, 'cs_condition', cmdGroup);
+        this.addCommandForChangedParameterName(parameter, newParameterName, 'rbro_text_element_content', 'content', cmdGroup);
+        this.addCommandForChangedParameterName(parameter, newParameterName, 'rbro_text_element_print_if', 'printIf', cmdGroup);
+        this.addCommandForChangedParameterName(parameter, newParameterName, 'rbro_text_element_cs_condition', 'cs_condition', cmdGroup);
     }
 
     toJS() {

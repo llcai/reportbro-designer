@@ -75,18 +75,18 @@ export default class FrameElement extends DocElement {
         return this.linkedContainerId;
     }
     
-    setValue(field, value) {
+    setValue(field, value, elSelector, isShown) {
         if (field.indexOf('border') !== -1) {
-            // Style.setBorderValue needs to be called before super.setValue
-            // because it calls updateStyle() which expects the correct border settings
+            // Style.setBorderValue needs to be called before super.setValue because it calls updateStyle() which expects
+            // the correct border settings
             this[field] = value;
             if (field === 'borderWidth') {
                 this.borderWidthVal = utils.convertInputToNumber(value);
             }
-            Style.setBorderValue(this, field, '', value, this.rb);
+            Style.setBorderValue(this, field, '', value, elSelector, isShown);
         }
 
-        super.setValue(field, value);
+        super.setValue(field, value, elSelector, isShown);
 
         if (field === 'label') {
             this.updateName();
@@ -143,17 +143,8 @@ export default class FrameElement extends DocElement {
      * @returns {String[]}
      */
     getFields() {
-        let fields = this.getProperties();
-        fields.splice(0, 0, 'id', 'containerId', 'linkedContainerId');
-        return fields;
-    }
-
-    /**
-     * Returns all fields of this object that can be modified in the properties panel.
-     * @returns {String[]}
-     */
-    getProperties() {
-        return ['label', 'x', 'y', 'width', 'height', 'backgroundColor',
+        return ['id', 'containerId', 'linkedContainerId', 'label',
+            'x', 'y', 'width', 'height', 'backgroundColor',
             'borderAll', 'borderLeft', 'borderTop', 'borderRight', 'borderBottom', 'borderColor', 'borderWidth',
             'printIf', 'removeEmptyElement', 'shrinkToContentHeight',
             'spreadsheet_hide', 'spreadsheet_column', 'spreadsheet_addEmptyRow'];
@@ -161,6 +152,22 @@ export default class FrameElement extends DocElement {
 
     getElementType() {
         return DocElement.type.frame;
+    }
+
+    getXTagId() {
+        return 'rbro_frame_element_position_x';
+    }
+
+    getYTagId() {
+        return 'rbro_frame_element_position_y';
+    }
+
+    getWidthTagId() {
+        return 'rbro_frame_element_width';
+    }
+
+    getHeightTagId() {
+        return 'rbro_frame_element_height';
     }
 
     createElement() {
@@ -201,6 +208,6 @@ export default class FrameElement extends DocElement {
      * @param {CommandGroupCmd} cmdGroup - possible SetValue commands will be added to this command group.
      */
     addCommandsForChangedParameterName(parameter, newParameterName, cmdGroup) {
-        this.addCommandForChangedParameterName(parameter, newParameterName, 'printIf', cmdGroup);
+        this.addCommandForChangedParameterName(parameter, newParameterName, 'rbro_frame_element_print_if', 'printIf', cmdGroup);
     }
 }

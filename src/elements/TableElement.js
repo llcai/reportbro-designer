@@ -50,6 +50,7 @@ export default class TableElement extends DocElement {
         this.contentDataRows = contentDataRows;
         this.footerData = this.createBand('footer', -1, null);
         this.setupComplete = true;
+        this.updateWidth();
         this.updateHeight();
         this.updateStyle();
         this.updateName();
@@ -124,8 +125,8 @@ export default class TableElement extends DocElement {
         return maxId;
     }
 
-    setValue(field, value) {
-        super.setValue(field, value);
+    setValue(field, value, elSelector, isShown) {
+        super.setValue(field, value, elSelector, isShown);
         if (field === 'dataSource') {
             this.updateName();
         } else if (field === 'header') {
@@ -215,17 +216,7 @@ export default class TableElement extends DocElement {
      * @returns {String[]}
      */
     getFields() {
-        let fields = this.getProperties();
-        fields.splice(0, 0, 'id', 'containerId', 'width');
-        return fields;
-    }
-
-    /**
-     * Returns all fields of this object that can be modified in the properties panel.
-     * @returns {String[]}
-     */
-    getProperties() {
-        return ['x', 'y', 'dataSource', 'columns', 'header', 'contentRows', 'footer',
+        return ['id', 'containerId', 'x', 'y', 'dataSource', 'columns', 'header', 'contentRows', 'footer',
             'border', 'borderColor', 'borderWidth',
             'printIf', 'removeEmptyElement',
             'spreadsheet_hide', 'spreadsheet_column', 'spreadsheet_addEmptyRow'];
@@ -251,6 +242,22 @@ export default class TableElement extends DocElement {
         return [];
     }
 
+    getXTagId() {
+        return 'rbro_table_element_position_x';
+    }
+
+    getYTagId() {
+        return 'rbro_table_element_position_y';
+    }
+
+    getWidthTagId() {
+        return 'rbro_table_element_width';
+    }
+
+    getHeightTagId() {
+        return 'rbro_table_element_height';
+    }
+
     isDroppingAllowed() {
         return false;
     }
@@ -268,7 +275,6 @@ export default class TableElement extends DocElement {
             </div>`);
         this.appendToContainer();
         this.registerEventHandlers();
-        $(`#rbro_el_table${this.id}`).css('width', (this.widthVal + 1) + 'px');
     }
 
     remove() {
@@ -312,6 +318,18 @@ export default class TableElement extends DocElement {
                 this.contentDataRows[i].updateColumnDisplay();
             }
             this.footerData.updateColumnDisplay();
+        }
+    }
+
+    /**
+     * Update table width based on width of all cells of content band.
+     */
+    updateWidth() {
+        if (this.setupComplete) {
+            let width = this.headerData.getWidth();
+            this.width = '' + width;
+            this.widthVal = width;
+            $(`#rbro_el_table${this.id}`).css('width', (this.widthVal + 1) + 'px');
         }
     }
 
@@ -425,7 +443,7 @@ export default class TableElement extends DocElement {
      * @param {CommandGroupCmd} cmdGroup - possible SetValue commands will be added to this command group.
      */
     addCommandsForChangedParameterName(parameter, newParameterName, cmdGroup) {
-        this.addCommandForChangedParameterName(parameter, newParameterName, 'dataSource', cmdGroup);
+        this.addCommandForChangedParameterName(parameter, newParameterName, 'rbro_table_element_data_source', 'dataSource', cmdGroup);
     }
 
     /**
@@ -454,34 +472,19 @@ export default class TableElement extends DocElement {
     }
 
     /**
-     * Returns true if there is enough space for the given column count, false otherwise.
-     * @param {Number} columns - column count to test for available space.
-     * @returns {Boolean}
+     * Adds commands to command group parameter to recreate table with new column count.
+     * @param {Number} columns - requested new column count.
+     * @param {CommandGroupCmd} cmdGroup - possible commands will be added to this command group.
+     * @returns {Number} either new column count or existing column count in case there is not enough space
+     * for all column.
      */
-    hasEnoughAvailableSpace(columns) {
+    addCommandsForChangedColumns(columns, cmdGroup) {
         let existingColumns = utils.convertInputToNumber(this.columns);
         let maxColumns = Math.floor(this.widthVal / TableElement.getColumnMinWidth());
         if (columns > existingColumns && columns > maxColumns) {
             // not enough space for all columns
-            return false;
+            return existingColumns;
         }
-        return true;
-    }
-    /**
-     * Adds commands to command group parameter to recreate table with new column count.
-     *
-     * The commands are only added if there is enough space available for the new columns.
-     * This should be checked beforehand by calling hasEnoughAvailableSpace.
-     *
-     * @param {Number} columns - requested new column count.
-     * @param {CommandGroupCmd} cmdGroup - possible commands will be added to this command group.
-     */
-    addCommandsForChangedColumns(columns, cmdGroup) {
-        if (!this.hasEnoughAvailableSpace(columns)) {
-            return;
-        }
-
-        let existingColumns = utils.convertInputToNumber(this.columns);
 
         // delete table with current settings and restore below with new columns, necessary for undo/redo
         let cmd = new AddDeleteDocElementCmd(false, this.getPanelItem().getPanelName(),
@@ -513,6 +516,8 @@ export default class TableElement extends DocElement {
         cmd = new AddDeleteDocElementCmd(true, this.getPanelItem().getPanelName(),
             this.toJS(), this.id, this.getContainerId(), -1, this.rb);
         cmdGroup.addCommand(cmd);
+        
+        return columns;
     }
 
     /**
@@ -525,8 +530,7 @@ export default class TableElement extends DocElement {
             return;
         }
         // delete table with current settings and restore below with new columns, necessary for undo/redo
-        let cmd = new AddDeleteDocElementCmd(
-            false, this.getPanelItem().getPanelName(),
+        let cmd = new AddDeleteDocElementCmd(false, this.getPanelItem().getPanelName(),
             this.toJS(), this.id, this.getContainerId(), -1, this.rb);
         cmdGroup.addCommand(cmd);
 
@@ -552,8 +556,7 @@ export default class TableElement extends DocElement {
 
         this.contentRows = '' + contentRows;
         // restore table with new content rows and updated settings
-        cmd = new AddDeleteDocElementCmd(
-            true, this.getPanelItem().getPanelName(),
+        cmd = new AddDeleteDocElementCmd(true, this.getPanelItem().getPanelName(),
             this.toJS(), this.id, this.getContainerId(), -1, this.rb);
         cmdGroup.addCommand(cmd);
     }

@@ -102,7 +102,7 @@ export default class DocElement {
                             this.id, this.containerId, this.linkedContainerId,
                             this.getElementType(), DocElement.dragType.element);
                     } else {
-                        this.rb.deselectAll(true);
+                        this.rb.deselectAll();
                     }
                 }
                 event.stopPropagation();
@@ -321,24 +321,24 @@ export default class DocElement {
             height = containerSize.height - y;
         }
 
-        if (x !== this.xVal && this.hasProperty('x')) {
-            let cmd = new SetValueCmd(
-                this.id, 'x', '' + x, SetValueCmd.type.text, this.rb);
+        if (x !== this.xVal && this.getXTagId() !== '') {
+            let cmd = new SetValueCmd(this.id, this.getXTagId(), 'x',
+                '' + x, SetValueCmd.type.text, this.rb);
             cmd.disableSelect();
             cmdGroup.addCommand(cmd);
         }
-        if (y !== this.yVal && this.hasProperty('y')) {
-            let cmd = new SetValueCmd(
-                this.id, 'y', '' + y, SetValueCmd.type.text, this.rb);
+        if (y !== this.yVal && this.getYTagId() !== '') {
+            let cmd = new SetValueCmd(this.id, this.getYTagId(), 'y',
+                '' + y, SetValueCmd.type.text, this.rb);
             cmd.disableSelect();
             cmdGroup.addCommand(cmd);
         }
-        if (width !== this.getDisplayWidth() && this.hasProperty('width')) {
+        if (width !== this.getDisplayWidth() && this.getWidthTagId() !== '') {
             this.addCommandsForChangedWidth(width, true, cmdGroup);
         }
-        if (height !== this.getDisplayHeight() && this.hasProperty('height')) {
-            let cmd = new SetValueCmd(
-                this.id, 'height', '' + height, SetValueCmd.type.text, this.rb);
+        if (height !== this.getDisplayHeight() && this.getHeightTagId() !== '') {
+            let cmd = new SetValueCmd(this.id, this.getHeightTagId(), 'height',
+                '' + height, SetValueCmd.type.text, this.rb);
             cmd.disableSelect();
             cmdGroup.addCommand(cmd);
         }
@@ -361,7 +361,7 @@ export default class DocElement {
         return this[field];
     }
 
-    setValue(field, value) {
+    setValue(field, value, elSelector, isShown) {
         this[field] = value;
         if (field === 'x' || field === 'y' || field === 'width' || field === 'height') {
             this[field + 'Val'] = utils.convertInputToNumber(value);
@@ -417,30 +417,15 @@ export default class DocElement {
      * @returns {String[]}
      */
     getFields() {
-        let fields = this.getProperties();
-        fields.splice(0, 0, 'id', 'containerId');
-        return fields;
-    }
-
-    /**
-     * Returns all fields of this object that can be modified in the properties panel.
-     * @returns {String[]}
-     */
-    getProperties() {
         return [];
-    }
-
-    /**
-     * Returns true if the given property is available for this object.
-     * @param {String} property - property name.
-     * @returns {Boolean}
-     */
-    hasProperty(property) {
-        return this.getProperties().indexOf(property) !== -1;
     }
 
     getElementType() {
         return DocElement.type.none;
+    }
+
+    setBorderAll(fieldPrefix, value) {
+        this[fieldPrefix + 'borderAll'] = value;
     }
 
     updateDisplay() {
@@ -624,8 +609,8 @@ export default class DocElement {
                 this.checkBounds(posX1, posY1, width, height, containerSize, cmdGroup);
 
                 if (containerChanged) {
-                    let cmd = new SetValueCmd(
-                        this.id, 'containerId', dragContainer.getId(), SetValueCmd.type.internal, this.rb);
+                    let cmd = new SetValueCmd(this.id, null, 'containerId',
+                        dragContainer.getId(), SetValueCmd.type.internal, this.rb);
                     cmdGroup.addCommand(cmd);
                     cmd = new MovePanelItemCmd(this.getPanelItem(), dragContainer.getPanelItem(),
                         dragContainer.getPanelItem().getChildren().length, this.rb);
@@ -698,6 +683,38 @@ export default class DocElement {
      */
     getSizers() {
         return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    }
+
+    /**
+     * Returns id for dom element of x value.
+     * @returns {String} Is empty in case doc element does not have x value.
+     */
+    getXTagId() {
+        return '';
+    }
+
+    /**
+     * Returns id for dom element of y value.
+     * @returns {String} Is empty in case doc element does not have y value.
+     */
+    getYTagId() {
+        return '';
+    }
+
+    /**
+     * Returns id for dom element of width value.
+     * @returns {String} Is empty in case doc element does not have width value.
+     */
+    getWidthTagId() {
+        return '';
+    }
+
+    /**
+     * Returns id for dom element of height value.
+     * @returns {String} Is empty in case doc element does not have height value.
+     */
+    getHeightTagId() {
+        return '';
     }
 
     hasBorderSettings() {
@@ -809,10 +826,11 @@ export default class DocElement {
      * specified object field.
      * @param {Parameter} parameter - parameter which will be renamed.
      * @param {String} newParameterName - new name of the parameter.
+     * @param {String} tagId
      * @param {String} field
      * @param {CommandGroupCmd} cmdGroup - possible SetValue command will be added to this command group.
      */
-    addCommandForChangedParameterName(parameter, newParameterName, field, cmdGroup) {
+    addCommandForChangedParameterName(parameter, newParameterName, tagId, field, cmdGroup) {
         let paramParent = parameter.getParent();
         let dataSources = [];
         let paramRef = null;
@@ -856,7 +874,7 @@ export default class DocElement {
 
         if (paramRef !== null && newParamRef !== null && this.getValue(field).indexOf(paramRef) !== -1) {
             let cmd = new SetValueCmd(
-                this.id, field, utils.replaceAll(this.getValue(field), paramRef, newParamRef),
+                this.id, tagId, field, utils.replaceAll(this.getValue(field), paramRef, newParamRef),
                 SetValueCmd.type.text, this.rb);
             cmdGroup.addCommand(cmd);
         }
@@ -881,8 +899,8 @@ export default class DocElement {
     }
 
     addCommandsForChangedWidth(newWidth, disableSelect, cmdGroup) {
-        let cmd = new SetValueCmd(
-            this.id, 'width', '' + newWidth, SetValueCmd.type.text, this.rb);
+        let cmd = new SetValueCmd(this.id, this.getWidthTagId(), 'width',
+            '' + newWidth, SetValueCmd.type.text, this.rb);
         if (disableSelect) {
             cmd.disableSelect();
         }

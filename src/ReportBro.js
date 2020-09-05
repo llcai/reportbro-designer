@@ -18,14 +18,23 @@ import SectionElement from './elements/SectionElement';
 import TableElement from './elements/TableElement';
 import TableTextElement from './elements/TableTextElement';
 import locales from './i18n/locales';
-import DocElementPanel from './panels/DocElementPanel';
+import BarCodeElementPanel from './panels/BarCodeElementPanel';
 import DocumentPropertiesPanel from './panels/DocumentPropertiesPanel';
 import EmptyDetailPanel from './panels/EmptyDetailPanel';
-import ParameterPanel from './panels/ParameterPanel';
-import StylePanel from './panels/StylePanel';
+import FrameElementPanel from './panels/FrameElementPanel';
+import ImageElementPanel from './panels/ImageElementPanel';
+import LineElementPanel from './panels/LineElementPanel';
+import SectionBandElementPanel from './panels/SectionBandElementPanel';
+import SectionElementPanel from './panels/SectionElementPanel';
 import MainPanel from './menu/MainPanel';
 import MainPanelItem from './menu/MainPanelItem';
 import MenuPanel from './menu/MenuPanel';
+import PageBreakElementPanel from './panels/PageBreakElementPanel';
+import ParameterPanel from './panels/ParameterPanel';
+import StylePanel from './panels/StylePanel';
+import TableElementPanel from './panels/TableElementPanel';
+import TableBandElementPanel from './panels/TableBandElementPanel';
+import TextElementPanel from './panels/TextElementPanel';
 import * as utils from './utils';
 
 /**
@@ -34,9 +43,10 @@ import * as utils from './utils';
  */
 export default class ReportBro {
     constructor(element, properties) {
+        
         this.element = element;
         this.nextId = 1;
-        this.locale = locales[(properties && properties.localeKey) || 'en_us'];
+        this.locale = locales[properties.localeKey || 'en_us'];
 
         this.properties = {
             additionalFonts: [],
@@ -44,19 +54,15 @@ export default class ReportBro {
             cmdExecutedCallback: null,
             enableSpreadsheet: true,
             fonts: [
-                { name: 'Courier', value: Style.font.courier },
-                { name: 'Helvetica', value: Style.font.helvetica },
-                { name: 'Times New Roman', value: Style.font.times }
+                { name: 'Courier', value: 'courier' },
+                { name: 'Helvetica', value: 'helvetica' },
+                { name: 'Times New Roman', value: 'times' }
             ],
-            defaultFont: Style.font.helvetica,
             localStorageReportKey: null,
             menuShowButtonLabels: false,
-            menuShowDebug: false,
             menuSidebar: false,
             saveCallback: null,
-            selectCallback: null,
             showGrid: true,
-            highlightUnusedParameters: false,
             patternAdditionalDates: [],
             patternAdditionalNumbers: [],
             patternCurrencySymbol: '$',
@@ -75,7 +81,7 @@ export default class ReportBro {
                 { name: '$ #,##0.00', description: this.locale['patternNumber5'] }
             ],
             reportServerTimeout: 20000,
-            reportServerUrl: 'https://www.reportbro.com/report/run',
+            reportServerUrl: 'http://localhost:8000/reportbro/report/run',
             reportServerUrlCrossDomain: false
         };
         if (properties) {
@@ -89,22 +95,6 @@ export default class ReportBro {
         if (this.properties.additionalFonts.length > 0) {
             this.properties.fonts = this.properties.fonts.concat(this.properties.additionalFonts);
         }
-        // make sure defaultFont is available, otherwise use first entry of font list
-        let defaultFontExists = false;
-        for (let font of this.properties.fonts) {
-            if (this.properties.defaultFont === font.value) {
-                defaultFontExists = true;
-                break;
-            }
-        }
-        if (!defaultFontExists) {
-            if (this.properties.fonts.length > 0) {
-                this.properties.defaultFont = this.properties.fonts[0].value;
-            } else {
-                this.properties.defaultFont = '';
-            }
-        }
-
         if (this.properties.patternAdditionalDates.length > 0) {
             this.properties.patternDates = this.properties.patternDates.concat(this.properties.patternAdditionalDates);
         }
@@ -112,6 +102,7 @@ export default class ReportBro {
             this.properties.patternNumbers = this.properties.patternNumbers.concat(this.properties.patternAdditionalNumbers);
         }
 
+        this.detailData = null;
         this.document = new Document(element, this.properties.showGrid, this);
         this.popupWindow = new PopupWindow(element, this);
         this.docElements = [];
@@ -129,10 +120,19 @@ export default class ReportBro {
         this.activeDetailPanel = 'none';
         this.detailPanels = {
             'none': new EmptyDetailPanel(element, this),
-            'docElement': new DocElementPanel(element, this),
+            'bar_code': new BarCodeElementPanel(element, this),
+            'frame': new FrameElementPanel(element, this),
+            'text': new TextElementPanel(element, this),
+            'line': new LineElementPanel(element, this),
+            'image': new ImageElementPanel(element, this),
+            'page_break': new PageBreakElementPanel(element, this),
+            'table': new TableElementPanel(element, this),
+            'table_band': new TableBandElementPanel(element, this),
             'parameter': new ParameterPanel(element, this),
+            'section': new SectionElementPanel(element, this),
+            'section_band': new SectionBandElementPanel(element, this),
             'style': new StylePanel(element, this),
-            'documentProperties': new DocumentPropertiesPanel(element, this)
+            'documentProperties': new DocumentPropertiesPanel(this.documentProperties, element, this)
         };
 
         this.commandStack = [];
@@ -285,7 +285,7 @@ export default class ReportBro {
                         // Ctrl + Y: redo
                         this.redoCommand();
                         event.preventDefault();
-                        break;
+                        break; 
                     }
                     case 90: {
                         // Ctrl + Z: undo
@@ -320,12 +320,18 @@ export default class ReportBro {
                         case 39:  // right
                         case 40: {  // down
                             let cmdGroup = new CommandGroupCmd('Move element', this);
+                            let tagId;
                             let field = (event.which === 37 || event.which === 39) ? 'x' : 'y';
                             let bandWidth = this.getDocumentProperties().getContentSize().width;
                             for (let selectionId of this.selections) {
                                 let obj = this.getDataObject(selectionId);
                                 if (obj instanceof DocElement) {
-                                    if (obj.hasProperty(field)) {
+                                    if (event.which === 37 || event.which === 39) {
+                                        tagId = obj.getXTagId();
+                                    } else {
+                                        tagId = obj.getYTagId();
+                                    }
+                                    if (tagId !== '') {
                                         let val = null;
                                         if (event.which === 37) {
                                             if (obj.getValue('xVal') > 0) {
@@ -343,12 +349,12 @@ export default class ReportBro {
                                         } else if (event.which === 40) {
                                             let containerSize = obj.getContainerContentSize();
                                             if ((obj.getValue('yVal') + obj.getValue('heightVal')) < containerSize.height) {
-                                                val = obj.getValue('yVal') + 1;
+                                                val = obj.getValue('yVal') + 1;											
                                             }
                                         }
                                         if (val !== null) {
-                                            let cmd = new SetValueCmd(
-                                                selectionId, field, val, SetValueCmd.type.text, this);
+                                            let cmd = new SetValueCmd(selectionId, tagId, field,
+                                                val, SetValueCmd.type.text, this);
                                             cmdGroup.addCommand(cmd);
                                         }
                                     }
@@ -403,7 +409,7 @@ export default class ReportBro {
         for (let panelName in this.detailPanels) {
             this.detailPanels[panelName].render();
         }
-        this.detailPanels[this.activeDetailPanel].show();
+        this.detailPanels[this.activeDetailPanel].show(this.detailData);
         this.document.render();
         this.popupWindow.render();
         this.updateMenuButtons();
@@ -498,10 +504,8 @@ export default class ReportBro {
     /**
      * Returns a list of parameter items.
      * Used for parameter popup window.
-     * @param {DocElement|Parameter} obj - adds all parameters available for
-     * this object (which is either a doc element or a parameter).
-     * For doc elements the parameters from the data source
-     * are included (e.g. array field parameters of a table data source).
+     * @param {DocElement|Parameter} obj - adds all parameters available for this object (which is either a doc element or a parameter).
+     * For doc elements the parameters from the data source are included (e.g. array field parameters of a table data source).
      * @param {String[]} allowedTypes - specify allowed parameter types which will be added to the
      * parameters list. If not set all parameter types are allowed.
      * @returns {Object[]} Each item contains name (String), optional description (String) and
@@ -528,13 +532,10 @@ export default class ReportBro {
                     }
                 }
             }
-        } else if (obj instanceof Parameter) {
-            obj.appendFieldParameterItems(parameters, allowedTypes, true);
         }
 
         parameters.push({ separator: true, name: this.getLabel('parameters') });
-        // add all parameters of collections at end of list with a header containing the collection name
-        let mapParameters = [];
+        let mapParameters = []; // add all parameters of collections at end of list with a header containing the collection name
         for (let parameterItem of parameterItems) {
             let parameter = parameterItem.getData();
             if (parameter.getValue('type') === Parameter.type.map) {
@@ -549,19 +550,19 @@ export default class ReportBro {
     /**
      * Returns a list of all array field parameter items.
      * Used for parameter popup window.
-     * @param {String[]} allowedTypes - specify allowed parameter types which will
-     * be added to the parameters list. If not set all parameter types are allowed.
+     * @param {String} fieldType - allowed parameter type which will be added to the
+     * parameter list. If empty all parameter types are allowed.
      * @returns {Object[]} Each item contains name (String), optional description (String) and
      * optional separator (Boolean).
      */
-    getArrayFieldParameterItems(allowedTypes) {
+    getArrayFieldParameterItems(fieldType) {
         let parameters = [];
         let parameterItems = this.getMainPanel().getParametersItem().getChildren();
         parameters.push({ separator: true, name: this.getLabel('parameters') });
         for (let parameterItem of parameterItems) {
             let parameter = parameterItem.getData();
             if (parameter.getValue('type') === Parameter.type.array) {
-                parameter.appendFieldParameterItems(parameters, allowedTypes, false);
+                parameter.appendFieldParameterItems(parameters, fieldType);
             }
         }
         return parameters;
@@ -620,12 +621,15 @@ export default class ReportBro {
         return docElements;
     }
 
-    setDetailPanel(panelName) {
-        if (panelName !== this.activeDetailPanel) {
-            this.detailPanels[this.activeDetailPanel].hide();
-            this.activeDetailPanel = panelName;
-            this.detailPanels[panelName].show();
-        }
+    setDetailPanel(panelName, data) {
+        this.detailPanels[this.activeDetailPanel].hide();
+        this.activeDetailPanel = panelName;
+        this.detailData = data;
+        this.detailPanels[panelName].show(data);
+    }
+
+    updateDetailPanel() {
+        this.detailPanels[this.activeDetailPanel].updateData(this.detailData);
     }
 
     /**
@@ -635,8 +639,27 @@ export default class ReportBro {
      * @param {[String]} field - affected field in case of change operation.
      */
     notifyEvent(obj, operation, field) {
-        this.detailPanels[this.activeDetailPanel].notifyEvent(obj, operation, field);
-    }
+        if (obj instanceof Parameter) {
+            if (obj.getValue('type') === Parameter.type.array || obj.getValue('type') === Parameter.type.map) {
+                $(`#rbro_menu_item_add${obj.getId()}`).show();
+                $(`#rbro_menu_item_children${obj.getId()}`).show();
+                $(`#rbro_menu_item_children_toggle${obj.getId()}`).show();
+            } else {
+                $(`#rbro_menu_item_add${obj.getId()}`).hide();
+                $(`#rbro_menu_item_children${obj.getId()}`).hide();
+                $(`#rbro_menu_item_children_toggle${obj.getId()}`).hide();
+            }
+        } else if (obj instanceof Style) {
+            if (operation === Command.operation.change) {
+                for (let docElement of this.docElements) {
+                    docElement.updateChangedStyle(obj.getId());
+                }
+            }
+        }
+        for (let panelName in this.detailPanels) {
+            this.detailPanels[panelName].notifyEvent(obj, operation);
+        }
+    }	
 
     addParameter(parameter) {
         this.addDataObject(parameter);
@@ -675,6 +698,10 @@ export default class ReportBro {
         this.docElements = [];
     }
 
+    getDetailData() {
+        return this.detailData;
+    }
+
     getDocumentProperties() {
         return this.documentProperties;
     }
@@ -684,12 +711,12 @@ export default class ReportBro {
         if (this.lastCommandIndex < (this.commandStack.length - 1)) {
             this.commandStack = this.commandStack.slice(0, this.lastCommandIndex + 1);
         }
-        if (!this.selectionSinceLastCommand && this.commandStack.length > 0) {
-            // if previous command can be replaced by current command
+        if (!this.selectionSinceLastCommand && cmd instanceof SetValueCmd && this.commandStack.length > 0) {
+            // if previous and current command are both SetValueCmds and target the same text field,
             // we can discard the previous command and only keep the latest update
             let prevCmd = this.commandStack[this.commandStack.length - 1];
-            if (cmd.allowReplace(prevCmd)) {
-                cmd.replace(prevCmd);
+            if (prevCmd instanceof SetValueCmd && prevCmd.allowReplace(cmd)) {
+                cmd.oldValue = prevCmd.oldValue;
                 this.commandStack = this.commandStack.slice(0, this.commandStack.length - 1);
                 this.lastCommandIndex--;
             }
@@ -743,7 +770,7 @@ export default class ReportBro {
         let elementSameContainerOffsetY = true;
         for (let selectionId of this.selections) {
             let obj = this.getDataObject(selectionId);
-            if (obj instanceof DocElement && obj.hasProperty('x')) {
+            if (obj instanceof DocElement && obj.getXTagId() !== '') {
                 elementCount++;
                 let container = obj.getContainer();
                 let offset = container.getOffset();
@@ -810,7 +837,7 @@ export default class ReportBro {
     }
 
     debugCommandStack() {
-        console.clear();
+        console.clear();		
         for (let i=0; i < this.commandStack.length; i++) {
             if (i > this.lastCommandIndex) {
                 console.log('( ' + i + ' ' + this.commandStack[i].getName() + ' )');
@@ -839,17 +866,6 @@ export default class ReportBro {
             return this.objectMap[id];
         }
         return null;
-    }
-
-    getSelectedObjects() {
-        let rv = [];
-        for (let selectionId of this.selections) {
-            let obj = this.getDataObject(selectionId);
-            if (obj !== null) {
-                rv.push(obj);
-            }
-        }
-        return rv;
     }
 
     getSelectedObject() {
@@ -886,42 +902,18 @@ export default class ReportBro {
     }
 
     selectObject(id, clearSelection) {
-        let detailPanel = 'none';
-        let obj = this.getDataObject(id);
         if (clearSelection) {
-            if (obj !== null && this.selections.length === 1 && this.selections[0] === id) {
-                // nothing to do, selection did not change
-                return;
-            }
-            this.deselectAll(true);
+            this.deselectAll();
         }
+        let obj = this.getDataObject(id);
         if (obj !== null) {
-            if (obj instanceof DocElement) {
-                detailPanel = 'docElement';
-            } else if (obj instanceof Parameter) {
-                detailPanel = 'parameter';
-            } else if (obj instanceof Style) {
-                detailPanel = 'style';
-            } else if (obj instanceof DocumentProperties) {
-                detailPanel = 'documentProperties';
-            }
-
             this.selections.push(id);
             obj.select();
             if (obj.getPanelItem() !== null) {
                 obj.getPanelItem().openParentItems();
                 obj.getPanelItem().setActive();
             }
-            if (detailPanel !== this.activeDetailPanel) {
-                this.setDetailPanel(detailPanel);
-            }
-            this.detailPanels[this.activeDetailPanel].selectionChanged();
-
-            if (this.properties.selectCallback) {
-                this.properties.selectCallback(obj, true);
-            }
         }
-
         this.selectionSinceLastCommand = true;
         this.updateMenuActionButtons();
     }
@@ -935,36 +927,24 @@ export default class ReportBro {
         let obj = this.getDataObject(id);
         if (obj !== null) {
             obj.deselect();
-            if (obj.getPanelItem() !== null) {
-                obj.getPanelItem().setInactive();
+            if (this.detailData === obj) {
+                this.setDetailPanel('none', null);
+                $('.rbroMenuItem').removeClass('rbroMenuItemActive');
             }
         }
-
         if (updateSelections) {
             let selectionIndex = this.selections.indexOf(id);
             if (selectionIndex !== -1) {
                 this.selections.splice(selectionIndex, 1);
             }
-            if (this.selections.length > 0) {
-                this.detailPanels[this.activeDetailPanel].selectionChanged();
-            } else {
-                this.setDetailPanel('none');
-            }
-        }
-
-        if (obj !== null && this.properties.selectCallback) {
-            this.properties.selectCallback(obj, false);
         }
     }
 
-    deselectAll(notifyPanel) {
+    deselectAll() {
         for (let selectionId of this.selections) {
             this.deselectObjectInternal(selectionId, false);
         }
         this.selections = [];
-        if (notifyPanel) {
-            this.setDetailPanel('none');
-        }
         this.updateMenuActionButtons();
     }
 
@@ -1044,7 +1024,7 @@ export default class ReportBro {
         let elementCount = 0;
         for (let selectionId of this.selections) {
             let obj = this.getDataObject(selectionId);
-            if (obj instanceof DocElement && obj.hasProperty('x')) {
+            if (obj instanceof DocElement && obj.getXTagId() !== '') {
                 elementCount++;
                 x = obj.getValue('xVal');
                 y = obj.getValue('yVal');
@@ -1073,42 +1053,38 @@ export default class ReportBro {
                 if (obj instanceof DocElement && !(obj instanceof PageBreakElement)) {
                     switch (alignment) {
                         case Style.alignment.left: {
-                            let cmd = new SetValueCmd(
-                                obj.getId(), 'x', '' + minX, SetValueCmd.type.text, this);
+                            let cmd = new SetValueCmd(obj.getId(), obj.getXTagId(), 'x',
+                                '' + minX, SetValueCmd.type.text, this);
                             cmdGroup.addCommand(cmd);
                         }
                         break;
                         case Style.alignment.center: {
-                            let cmd = new SetValueCmd(
-                                obj.getId(), 'x', '' + (center - (obj.getValue('widthVal') / 2)),
-                                SetValueCmd.type.text, this);
+                            let cmd = new SetValueCmd(obj.getId(), obj.getXTagId(), 'x',
+                                '' + (center - (obj.getValue('widthVal') / 2)), SetValueCmd.type.text, this);
                             cmdGroup.addCommand(cmd);
                         }
                         break;
                         case Style.alignment.right: {
-                            let cmd = new SetValueCmd(
-                                obj.getId(), 'x', '' + (maxX - obj.getValue('widthVal')),
-                                SetValueCmd.type.text, this);
+                            let cmd = new SetValueCmd(obj.getId(), obj.getXTagId(), 'x',
+                                '' + (maxX - obj.getValue('widthVal')), SetValueCmd.type.text, this);
                             cmdGroup.addCommand(cmd);
                         }
                         break;
                         case Style.alignment.top: {
-                            let cmd = new SetValueCmd(
-                                obj.getId(), 'y', '' + minY, SetValueCmd.type.text, this);
+                            let cmd = new SetValueCmd(obj.getId(), obj.getYTagId(), 'y',
+                                '' + minY, SetValueCmd.type.text, this);
                             cmdGroup.addCommand(cmd);
                         }
                         break;
                         case Style.alignment.middle: {
-                            let cmd = new SetValueCmd(
-                                obj.getId(), 'y', '' + (vcenter - (obj.getValue('heightVal') / 2)),
-                                SetValueCmd.type.text, this);
+                            let cmd = new SetValueCmd(obj.getId(), obj.getYTagId(), 'y',
+                                '' + (vcenter - (obj.getValue('heightVal') / 2)), SetValueCmd.type.text, this);
                             cmdGroup.addCommand(cmd);
                         }
                         break;
                         case Style.alignment.bottom: {
-                            let cmd = new SetValueCmd(
-                                obj.getId(), 'y', '' + (maxY - obj.getValue('heightVal')),
-                                SetValueCmd.type.text, this);
+                            let cmd = new SetValueCmd(obj.getId(), obj.getYTagId(), 'y',
+                                '' + (maxY - obj.getValue('heightVal')), SetValueCmd.type.text, this);
                             cmdGroup.addCommand(cmd);
                         }
                         break;
@@ -1196,9 +1172,8 @@ export default class ReportBro {
             }
         }
         if (errors.length > 0) {
-            this.deselectAll(false);
-            this.selectObject(errors[0].object_id, false);
-            this.detailPanels[this.activeDetailPanel].scrollToFirstError();
+            this.detailPanels[this.activeDetailPanel].updateErrors();
+            this.selectObject(errors[0].object_id, true);
         }
     }
 
@@ -1210,14 +1185,11 @@ export default class ReportBro {
      */
     previewInternal(data, isTestData) {
         let self = this;
-        // clear all error classes and texts
         $('.rbroMenuItem').removeClass('rbroError');
-        $('.rbroFormRow').removeClass('rbroError');
-        $('.rbroErrorMessage').text('');
         for (let objId in this.objectMap) {
             this.objectMap[objId].clearErrors();
         }
-
+        this.detailPanels[this.activeDetailPanel].updateErrors();
         this.showLoading();
         $.ajax(this.properties.reportServerUrl, {
             data: JSON.stringify({
@@ -1264,7 +1236,6 @@ export default class ReportBro {
 
     /**
      * Sets the internal modified flag.
-     *
      * If true the save button is enabled, otherwise the save button is disabled.
      * @param {Boolean} modified
      */
@@ -1274,23 +1245,11 @@ export default class ReportBro {
     }
 
     /**
-     * Returns the internal modified flag.
-     *
-     * If the flag is true the save button is enabled, otherwise the save button is disabled and
-     * there was no change to the report since the flag was last set to false (this happens
-     * after save or by calling the setModified API method).
-     * @returns {Boolean}
-     */
-    isModified() {
-        return this.modified;
-    }
-
-    /**
      * Returns report object containing everything needed for the report.
      * @returns {Object}
      */
     getReport() {
-        let ret = { docElements: [], parameters: [], styles: [], version: 3 };
+        let ret = { docElements: [], parameters: [], styles: [], version: 2 };
         let i;
         ret.docElements = this.getDocElements(false);
         for (let parameter of this.getParameters()) {
@@ -1300,7 +1259,7 @@ export default class ReportBro {
             ret.styles.push(style.toJS());
         }
         ret.documentProperties = this.documentProperties.toJS();
-
+        
         return ret;
     }
 
@@ -1321,16 +1280,6 @@ export default class ReportBro {
                 }
             }
         }
-
-        if (this.getProperty('highlightUnusedParameters')) {
-            // if unused parameters are highlighted the marker is removed on save
-            for (let parameter of this.getParameters()) {
-                if (parameter.editable) {
-                    parameter.setHighlightUnused(false);
-                }
-            }
-        }
-
         this.updateMenuButtons();
     }
 
@@ -1348,6 +1297,7 @@ export default class ReportBro {
         this.deleteDocElements();
 
         this.nextId = 1;
+        this.setDetailPanel('none', null);
         this.docElements = [];
         this.objectMap = {};
         this.initObjectMap();
@@ -1367,17 +1317,6 @@ export default class ReportBro {
                 }
             }
         }
-        if (report.version < 3) {
-            for (let docElementData of report.docElements) {
-                if (docElementData.elementType === DocElement.type.table) {
-                    let width = 0;
-                    for (let i=0; i < docElementData.headerData.columnData.length; i++) {
-                        width += docElementData.headerData.columnData[i].width;
-                    }
-                    docElementData.width = width;
-                }
-            }
-        }
 
         this.documentProperties.setInitialData(report.documentProperties);
         this.documentProperties.setup();
@@ -1390,33 +1329,6 @@ export default class ReportBro {
         }
         for (let docElementData of report.docElements) {
             this.createDocElement(docElementData);
-        }
-
-        if (this.getProperty('highlightUnusedParameters')) {
-            // highlight unused parameters when report is loaded
-
-            // to determine if a parameter is used we query the commands
-            // which would be necessary in case the parameter name is changed.
-            // if no commands are returned then the parameter is not used
-            let docElements = this.getDocElements(true);
-            for (let parameter of this.getParameters()) {
-                if (parameter.editable) {
-                    let cmdGroup = new CommandGroupCmd('Temp group');
-                    for (let docElement of docElements) {
-                        docElement.addCommandsForChangedParameterName(
-                            parameter, parameter.getName(), cmdGroup);
-                    }
-                    for (let otherParam of this.getParameters()) {
-                        if (otherParam.getId() !== parameter.getId()) {
-                            otherParam.addCommandsForChangedParameterName(
-                                parameter, parameter.getName(), cmdGroup);
-                        }
-                    }
-                    if (cmdGroup.isEmpty()) {
-                        parameter.setHighlightUnused(true);
-                    }
-                }
-            }
         }
 
         this.browserDragType = '';
@@ -1445,7 +1357,7 @@ export default class ReportBro {
             }
         }
     }
-
+  
     preview() {
         this.previewInternal(this.getTestData(), true);
     }
@@ -1461,19 +1373,6 @@ export default class ReportBro {
         if (this.reportKey !== null) {
             window.open(this.properties.reportServerUrl + '?key=' + this.reportKey + '&outputFormat=xlsx', '_blank');
         }
-    }
-
-    /**
-     * Delete ReportBro Instance including all dom nodes and all registered event handlers.
-     */
-    destroy() {
-        this.popupWindow.destroy();
-        for (let panelName in this.detailPanels) {
-            this.detailPanels[panelName].destroy();
-        }
-        this.element.remove();
-        $(document).off('keydown');
-        $(document).off('mouseup');
     }
 
     /**
@@ -1609,9 +1508,12 @@ export default class ReportBro {
     deleteDocElement(element) {
         for (let i=0; i < this.docElements.length; i++) {
             if (this.docElements[i].getId() === element.getId()) {
+                this.notifyEvent(element, Command.operation.remove);
+                if (this.detailData === this.docElements[i]) {
+                    this.setDetailPanel('none', null);
+                }
                 this.docElements.splice(i, 1);
                 this.deleteDataObject(element);
-                this.notifyEvent(element, Command.operation.remove);
                 break;
             }
         }
@@ -1623,9 +1525,9 @@ export default class ReportBro {
      * @param {Parameter} parameter - parameter to delete.
      */
     deleteParameter(parameter) {
+        this.notifyEvent(parameter, Command.operation.remove);
         this.deleteDataObject(parameter);
         parameter.getPanelItem().getParent().removeChild(parameter.getPanelItem());
-        this.notifyEvent(parameter, Command.operation.remove);
     }
 
     /**
@@ -1634,8 +1536,8 @@ export default class ReportBro {
      * @param {Style} style - style to delete.
      */
     deleteStyle(style) {
+        this.notifyEvent(style, Command.operation.remove);
         this.deleteDataObject(style);
         style.getPanelItem().getParent().removeChild(style.getPanelItem());
-        this.notifyEvent(style, Command.operation.remove);
     }
 }

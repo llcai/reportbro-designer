@@ -70,8 +70,8 @@ export default class SectionBandElement extends DocElement {
         return pos;
     }
 
-    setValue(field, value) {
-        super.setValue(field, value);
+    setValue(field, value, elSelector, isShown) {
+        super.setValue(field, value, elSelector, isShown);
 
         if (field === 'height') {
             this[field + 'Val'] = utils.convertInputToNumber(value);
@@ -87,21 +87,9 @@ export default class SectionBandElement extends DocElement {
      * @returns {String[]}
      */
     getFields() {
-        let fields = this.getProperties();
-        fields.splice(0, 0, 'id', 'containerId', 'linkedContainerId');
-        return fields;
-    }
-
-    /**
-     * Returns all fields of this object that can be modified in the properties panel.
-     * @returns {String[]}
-     */
-    getProperties() {
-        let fields;
+        let fields = ['id', 'containerId', 'linkedContainerId', 'height', 'alwaysPrintOnSamePage', 'shrinkToContentHeight'];
         if (this.bandType === Band.bandType.header) {
-            fields = ['height', 'repeatHeader', 'shrinkToContentHeight'];
-        } else {
-            fields = ['height', 'alwaysPrintOnSamePage', 'shrinkToContentHeight'];
+            fields.push('repeatHeader');
         }
         return fields;
     }
@@ -126,6 +114,10 @@ export default class SectionBandElement extends DocElement {
      */
     getSizers() {
         return ['S'];
+    }
+
+    getHeightTagId() {
+        return 'rbro_section_band_element_height';
     }
 
     getHeight() {

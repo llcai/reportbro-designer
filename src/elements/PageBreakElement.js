@@ -17,16 +17,16 @@ export default class PageBreakElement extends DocElement {
         this.updateStyle();
     }
 
-    setValue(field, value) {
-        super.setValue(field, value);
+    setValue(field, value, elSelector, isShown) {
+        super.setValue(field, value, elSelector, isShown);
     }
 
     /**
-     * Returns all fields of this object that can be modified in the properties panel.
+     * Returns all data fields of this object. The fields are used when serializing the object.
      * @returns {String[]}
      */
-    getProperties() {
-        return ['y'];
+    getFields() {
+        return ['id', 'containerId', 'y'];
     }
 
     getElementType() {
@@ -47,6 +47,10 @@ export default class PageBreakElement extends DocElement {
      */
     getSizers() {
         return [];
+    }
+
+    getYTagId() {
+        return 'rbro_page_break_element_position_y';
     }
 
     createElement() {
